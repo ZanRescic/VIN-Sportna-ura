@@ -1,0 +1,5 @@
+../Core/Src/main.c:219:6:oximeter5_Init	8	static
+../Core/Src/main.c:356:6:SystemClock_Config	120	static,ignoring_inline_asm
+../Core/Src/main.c:423:6:PeriphCommonClock_Config	200	static,ignoring_inline_asm
+../Core/Src/main.c:165:5:main	200	static,ignoring_inline_asm
+../Core/Src/main.c:1415:6:Error_Handler	0	static,ignoring_inline_asm
