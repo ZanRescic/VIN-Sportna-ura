@@ -85,6 +85,8 @@ SAI_HandleTypeDef hsai_BlockB2;
 MMC_HandleTypeDef hmmc1;
 
 SPI_HandleTypeDef hspi2;
+DMA_HandleTypeDef hdma_spi2_rx;
+DMA_HandleTypeDef hdma_spi2_tx;
 
 UART_HandleTypeDef huart3;
 
@@ -107,7 +109,7 @@ char SendBuffer[50];
 void SystemClock_Config(void);
 void PeriphCommonClock_Config(void);
 static void MX_GPIO_Init(void);
-static void MX_ADC1_Init(void);
+static void MX_DMA_Init(void);
 static void MX_ADC2_Init(void);
 static void MX_ADC3_Init(void);
 static void MX_ETH_Init(void);
@@ -122,6 +124,7 @@ static void MX_SDMMC1_MMC_Init(void);
 static void MX_SPI2_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_USB_OTG_FS_PCD_Init(void);
+static void MX_ADC1_Init(void);
 static void MX_I2C4_Init(void);
 /* USER CODE BEGIN PFP */
 
@@ -166,7 +169,7 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_ADC1_Init();
+  MX_DMA_Init();
   MX_ADC2_Init();
   MX_ADC3_Init();
   MX_ETH_Init();
@@ -180,6 +183,7 @@ int main(void)
   MX_SPI2_Init();
   MX_USART3_UART_Init();
   MX_USB_OTG_FS_PCD_Init();
+  MX_ADC1_Init();
   MX_I2C4_Init();
   /* USER CODE BEGIN 2 */
 
@@ -187,126 +191,13 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  application_init();
   while (1)
   {
+    /* USER CODE END WHILE */
 
-	  application_task();
+    /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
-}
-
-void application_init ( void ){
-	// Click initialization.
-	if (oximeter5_init() != HAL_ERROR){
-		if (oximeter5_default_cfg() != HAL_ERROR){
-			HAL_Delay ( 100 );
-			un_brightness = 0;
-			un_min = 0x3FFFF;
-			un_max = 0;
-			for ( uint8_t n_cnt = 0; n_cnt < 100; n_cnt++ )
-			{
-				while ( oximeter5_check_interrupt() == OXIMETER5_INTERRUPT_ACTIVE );
-
-				oximeter5_read_sensor_data( &aun_red_buffer[ n_cnt ], &aun_ir_buffer[ n_cnt ] );
-
-				if ( un_min > aun_red_buffer[ n_cnt ] )
-				{
-				un_min = aun_red_buffer[ n_cnt ];
-				}
-
-				if ( un_max < aun_red_buffer[ n_cnt ] )
-				{
-				un_max = aun_red_buffer[ n_cnt ];
-				}
-			}
-			oximeter5_get_oxygen_saturation( &aun_ir_buffer[ 0 ], 100, &aun_red_buffer[ 0 ], &n_spo2 );
-
-			HAL_Delay ( 100 );
-		}
-	}
-}
-void application_task ( void ){
-	for ( uint8_t n_cnt = 25; n_cnt < 100; n_cnt++ )
-	{
-		aun_red_buffer[ n_cnt - 25 ] = aun_red_buffer[ n_cnt ];
-		aun_ir_buffer[ n_cnt - 25 ] = aun_ir_buffer[ n_cnt ];
-
-		if ( un_min > aun_red_buffer[ n_cnt ] )
-		{
-			un_min = aun_red_buffer[ n_cnt ];
-		}
-
-		if ( un_max < aun_red_buffer[ n_cnt ] )
-		{
-			un_max=aun_red_buffer[n_cnt];
-		}
-	}
-
-	for ( uint8_t n_cnt = 75; n_cnt < 100; n_cnt++ )
-	{
-		un_prev_data = aun_red_buffer[ n_cnt - 1 ];
-		while ( oximeter5_check_interrupt() == OXIMETER5_INTERRUPT_ACTIVE );
-
-		oximeter5_read_sensor_data( &aun_red_buffer[ n_cnt ], &aun_ir_buffer[ n_cnt ] );
-
-		if ( aun_red_buffer[ n_cnt ] > un_prev_data )
-		{
-			f_temp = aun_red_buffer[ n_cnt ]-un_prev_data;
-			f_temp /= ( un_max - un_min );
-			f_temp *= MAX_BRIGHTNESS;
-			f_temp = un_brightness - f_temp;
-
-			if ( f_temp < 0 )
-			{
-				un_brightness = 0;
-			}
-			else
-			{
-				un_brightness = ( uint32_t ) f_temp;
-			}
-		}
-		else
-		{
-			f_temp = un_prev_data - aun_red_buffer[ n_cnt ];
-			f_temp /= ( un_max - un_min );
-			f_temp *= MAX_BRIGHTNESS;
-			un_brightness += ( uint32_t ) f_temp;
-
-			if ( un_brightness > MAX_BRIGHTNESS )
-			{
-				un_brightness = MAX_BRIGHTNESS;
-			}
-		}
-
-		if ( ( OXIMETER5_OK == oximeter5_get_oxygen_saturation( &aun_ir_buffer[ 0 ], 100, &aun_red_buffer[ 0 ], &n_spo2 ) ) )
-		{
-			if ( aun_ir_buffer[n_cnt] > 10000  )
-			{
-				snprintf(SendBuffer, sizeof(SendBuffer), "\tIR    : %lu \r\n", aun_ir_buffer[ n_cnt ]);
-				HAL_UART_Transmit(&huart3, SendBuffer, strlen(SendBuffer), 100);
-
-				snprintf(SendBuffer, sizeof(SendBuffer), "\tRED   : %lu \r\n", aun_red_buffer[ n_cnt ]);
-				HAL_UART_Transmit(&huart3, SendBuffer, strlen(SendBuffer), 100);
-
-				snprintf(SendBuffer, sizeof(SendBuffer), "- - - - - - - - - - - - - - -\r\n");
-				HAL_UART_Transmit(&huart3, SendBuffer, strlen(SendBuffer), 100);
-
-				snprintf(SendBuffer, sizeof(SendBuffer), "\tSPO2  : %d %%\r\n", ( uint16_t ) n_spo2);
-				HAL_UART_Transmit(&huart3, SendBuffer, strlen(SendBuffer), 100);
-
-				snprintf(SendBuffer, sizeof(SendBuffer), "- - - - - - - - - - - - - - -\r\n");
-				HAL_UART_Transmit(&huart3, SendBuffer, strlen(SendBuffer), 100);
-
-
-				HAL_Delay ( 100 );
-			}
-			else
-			{
-				HAL_Delay ( 10 );
-			}
-		}
-	}
 }
 
 /**
@@ -327,10 +218,6 @@ void SystemClock_Config(void)
   __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE2);
 
   while(!__HAL_PWR_GET_FLAG(PWR_FLAG_VOSRDY)) {}
-
-  /** Macro to configure the PLL clock source
-  */
-  __HAL_RCC_PLL_PLLSOURCE_CONFIG(RCC_PLLSOURCE_HSE);
 
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
@@ -423,7 +310,7 @@ static void MX_ADC1_Init(void)
   /** Common config
   */
   hadc1.Instance = ADC1;
-  hadc1.Init.ClockPrescaler = ADC_CLOCK_ASYNC_DIV2;
+  hadc1.Init.ClockPrescaler = ADC_CLOCK_ASYNC_DIV1;
   hadc1.Init.Resolution = ADC_RESOLUTION_16B;
   hadc1.Init.ScanConvMode = ADC_SCAN_DISABLE;
   hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
@@ -490,7 +377,7 @@ static void MX_ADC2_Init(void)
   /** Common config
   */
   hadc2.Instance = ADC2;
-  hadc2.Init.ClockPrescaler = ADC_CLOCK_ASYNC_DIV2;
+  hadc2.Init.ClockPrescaler = ADC_CLOCK_ASYNC_DIV1;
   hadc2.Init.Resolution = ADC_RESOLUTION_16B;
   hadc2.Init.ScanConvMode = ADC_SCAN_DISABLE;
   hadc2.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
@@ -1077,7 +964,7 @@ static void MX_SPI2_Init(void)
   hspi2.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi2.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi2.Init.NSS = SPI_NSS_HARD_INPUT;
-  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_4;
   hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi2.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -1186,6 +1073,25 @@ static void MX_USB_OTG_FS_PCD_Init(void)
 
 }
 
+/**
+  * Enable DMA controller clock
+  */
+static void MX_DMA_Init(void)
+{
+
+  /* DMA controller clock enable */
+  __HAL_RCC_DMA1_CLK_ENABLE();
+
+  /* DMA interrupt init */
+  /* DMA1_Stream0_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream0_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream0_IRQn);
+  /* DMA1_Stream1_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream1_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream1_IRQn);
+
+}
+
 /* FMC initialization function */
 static void MX_FMC_Init(void)
 {
@@ -1258,7 +1164,10 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOF_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOE, LCD_RST_R_Pin|LCD_DC_R_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOI, LCD_CS_R_Pin|LD2_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, MII_TX_ER_nINT_Pin|LCD_RST_Pin, GPIO_PIN_RESET);
@@ -1288,6 +1197,13 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Alternate = GPIO_AF10_SAI4;
   HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
 
+  /*Configure GPIO pins : LCD_RST_R_Pin LCD_DC_R_Pin */
+  GPIO_InitStruct.Pin = LCD_RST_R_Pin|LCD_DC_R_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
+
   /*Configure GPIO pins : USB_OTG_FS2_ID_Pin OTG_FS2_PSO_Pin */
   GPIO_InitStruct.Pin = USB_OTG_FS2_ID_Pin|OTG_FS2_PSO_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
@@ -1299,6 +1215,13 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : LCD_CS_R_Pin LD2_Pin */
+  GPIO_InitStruct.Pin = LCD_CS_R_Pin|LD2_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOI, &GPIO_InitStruct);
 
   /*Configure GPIO pin : PA8 */
   GPIO_InitStruct.Pin = GPIO_PIN_8;
@@ -1315,13 +1238,6 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   GPIO_InitStruct.Alternate = GPIO_AF6_SAI1;
   HAL_GPIO_Init(audio_Int_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : LD2_Pin */
-  GPIO_InitStruct.Pin = LD2_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : LCD_INT_Pin */
   GPIO_InitStruct.Pin = LCD_INT_Pin;

@@ -1,7 +1,7 @@
-../Core/Src/oximeter5custom.c:66:7:oximeter5_init	8	static
-../Core/Src/oximeter5custom.c:81:7:oximeter5_default_cfg	24	static
-../Core/Src/oximeter5custom.c:141:7:oximeter5_generic_write	288	static
-../Core/Src/oximeter5custom.c:165:7:oximeter5_generic_read	24	static
+../Core/Src/oximeter5custom.c:67:7:oximeter5_init	8	static
+../Core/Src/oximeter5custom.c:82:7:oximeter5_default_cfg	24	static
+../Core/Src/oximeter5custom.c:142:7:oximeter5_generic_write	288	static
+../Core/Src/oximeter5custom.c:166:7:oximeter5_generic_read	24	static
 ../Core/Src/oximeter5custom.c:187:9:oximeter5_check_interrupt	8	static
 ../Core/Src/oximeter5custom.c:193:7:oximeter5_sw_reset	16	static
 ../Core/Src/oximeter5custom.c:203:7:oximeter5_read_temperature	24	static

@@ -81,6 +81,8 @@ void Error_Handler(void);
 #define LCD_DISPD7_GPIO_Port GPIOD
 #define SDIO1_CK_Pin GPIO_PIN_12
 #define SDIO1_CK_GPIO_Port GPIOC
+#define LCD_RST_R_Pin GPIO_PIN_3
+#define LCD_RST_R_GPIO_Port GPIOE
 #define SDIO1_D5_Pin GPIO_PIN_9
 #define SDIO1_D5_GPIO_Port GPIOB
 #define SDIO1_D4_Pin GPIO_PIN_8
@@ -97,6 +99,10 @@ void Error_Handler(void);
 #define FDCAN1_TX_GPIO_Port GPIOH
 #define B1_Pin GPIO_PIN_13
 #define B1_GPIO_Port GPIOC
+#define LCD_CS_R_Pin GPIO_PIN_8
+#define LCD_CS_R_GPIO_Port GPIOI
+#define LCD_DC_R_Pin GPIO_PIN_6
+#define LCD_DC_R_GPIO_Port GPIOE
 #define SDIO1_D0_Pin GPIO_PIN_8
 #define SDIO1_D0_GPIO_Port GPIOC
 #define SDIO1_D1_Pin GPIO_PIN_9

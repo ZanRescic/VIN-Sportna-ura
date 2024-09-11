@@ -1,6 +1,7 @@
 #include "oximeter5custom.h"
 #include "main.h"
 #include <stdint.h>
+#include <stdio.h>
 
 #define SAMPLING_FREQUENCY          25
 #define BUFFER_SIZE                 ( SAMPLING_FREQUENCY * 4 )
@@ -70,11 +71,11 @@ err_t oximeter5_init ( void )
 	{
 		snprintf(SendBuffer1, sizeof(SendBuffer1), "Device not ready\n\r");
 		HAL_UART_Transmit(&huart3, SendBuffer1, strlen(SendBuffer1), 100);
-		return HAL_ERROR;
+		return OXIMETER5_ERROR;
 	} else {
 		snprintf(SendBuffer1, sizeof(SendBuffer1), "Device ready\n\r");
 		HAL_UART_Transmit(&huart3, SendBuffer1, strlen(SendBuffer1), 100);
-		return HAL_OK;
+		return OXIMETER5_OK;
 	}
 }
 
@@ -153,34 +154,33 @@ err_t oximeter5_generic_write ( uint8_t reg, uint8_t *tx_buf, uint8_t tx_len )
 	{
 		snprintf(SendBuffer1, sizeof(SendBuffer1), "Transmit failed\n\r");
 		//HAL_UART_Transmit(&huart3, SendBuffer1, strlen(SendBuffer1), 100);
-		return HAL_ERROR;
+		return OXIMETER5_ERROR;
 	} else {
 		snprintf(SendBuffer1, sizeof(SendBuffer1), "Transmit successful\n\r");
 		//HAL_UART_Transmit(&huart3, SendBuffer1, strlen(SendBuffer1), 100);
-		return HAL_OK;
+		return OXIMETER5_OK;
 	}
     //return i2c_master_write( &ctx->i2c, data_buf, tx_len + 1 );
 }
 
 err_t oximeter5_generic_read ( uint8_t reg, uint8_t *rx_buf, uint8_t rx_len )
 {
-	if (oximeter5_generic_write(reg, rx_buf, rx_len) == HAL_OK) {
-		retval = HAL_I2C_Master_Receive(&hi2c4, (OXIMETER5_SET_DEV_ADDR << 1), &rx_buf, rx_len, 1000);
+	if (oximeter5_generic_write(reg, rx_buf, rx_len) == OXIMETER5_OK) {
+		retval = HAL_I2C_Master_Receive(&hi2c4, (OXIMETER5_SET_DEV_ADDR << 1),rx_buf, rx_len, 1000);
 		if (retval != HAL_OK)
 		{
 			snprintf(SendBuffer1, sizeof(SendBuffer1), "Receive failed\n\r");
-			//HAL_UART_Transmit(&huart3, SendBuffer1, strlen(SendBuffer1), 100);
-			return HAL_ERROR;
+			HAL_UART_Transmit(&huart3, SendBuffer1, strlen(SendBuffer1), 100);
+			return OXIMETER5_ERROR;
 		} else {
 			snprintf(SendBuffer1, sizeof(SendBuffer1), "Receive successful\n\r");
-			//HAL_UART_Transmit(&huart3, SendBuffer1, strlen(SendBuffer1), 100);
-			return HAL_OK;
+			HAL_UART_Transmit(&huart3, SendBuffer1, strlen(SendBuffer1), 100);
+			return OXIMETER5_OK;
 		}
-	} else {
-		snprintf(SendBuffer1, sizeof(SendBuffer1), "Write before read failed\n\r");
-		//HAL_UART_Transmit(&huart3, SendBuffer1, strlen(SendBuffer1), 100);
-		return HAL_ERROR;
 	}
+	snprintf(SendBuffer1, sizeof(SendBuffer1), "Write before read failed\n\r");
+	HAL_UART_Transmit(&huart3, SendBuffer1, strlen(SendBuffer1), 100);
+	return OXIMETER5_ERROR;
     //return i2c_master_write_then_read( &ctx->i2c, &reg, 1, rx_buf, rx_len );
 }
 
