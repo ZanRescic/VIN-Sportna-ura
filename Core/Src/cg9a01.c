@@ -15,6 +15,11 @@
 #include "string.h";
 extern SPI_HandleTypeDef hspi2;
 extern UART_HandleTypeDef huart3;
+
+
+
+
+
 #define LCD_RST_1 HAL_GPIO_WritePin(LCD_RST_R_GPIO_Port,LCD_RST_R_Pin,GPIO_PIN_SET)			// LCD_RST = 1 , LCD RESET pin
 #define LCD_RST_0 HAL_GPIO_WritePin(LCD_RST_R_GPIO_Port,LCD_RST_R_Pin,GPIO_PIN_RESET)		// LCD_RST = 0 , LCD RESET pin
 
@@ -72,10 +77,6 @@ void  Write_Data_U16(unsigned int y)
 	Write_Data(m,n);
 }
 
-
-//===================================================================
-//write data byte
-
 void Write_Data(unsigned char DH,unsigned char DL)
 {
     LCD_CS_0;
@@ -99,40 +100,15 @@ void Write_Bytes(unsigned char * pbuff, unsigned short size)
 }
 
 
-HAL_StatusTypeDef SPI_Write(uint8_t* pbuff, uint16_t size)
-{
-	//DMA, use HAL_SPI_Transmit_DMA() function
+HAL_StatusTypeDef SPI_Write(uint8_t* pbuff, uint16_t size){
+
     HAL_StatusTypeDef status =  HAL_SPI_Transmit_DMA(&hspi2, pbuff, size);
 
-    /*switch (status) {
-		case HAL_OK:
-			snprintf(SendBuffer2,BUFSIZE2,"HAL_OK\n\r");
-			HAL_UART_Transmit(&huart3,SendBuffer2,strlen(SendBuffer2),100);
-			break;
-		case HAL_ERROR:
-			snprintf(SendBuffer2,BUFSIZE2,"HAL_ERROR\n\r");
-			HAL_UART_Transmit(&huart3,SendBuffer2,strlen(SendBuffer2),100);
-			break;
-		case HAL_BUSY:
-			snprintf(SendBuffer2,BUFSIZE2,"HAL_BUSY\n\r");
-			HAL_UART_Transmit(&huart3,SendBuffer2,strlen(SendBuffer2),100);
-			break;
-		case HAL_TIMEOUT:
-			snprintf(SendBuffer2,BUFSIZE2,"HAL_TIMEOUT\n\r");
-			HAL_UART_Transmit(&huart3,SendBuffer2,strlen(SendBuffer2),100);
-			break;
-		default:
-			snprintf(SendBuffer2,BUFSIZE2,"OTHER\n\r");
-			HAL_UART_Transmit(&huart3,SendBuffer2,strlen(SendBuffer2),100);
-			break;
-	}
-     */
     while(HAL_SPI_GetState(&hspi2) != HAL_SPI_STATE_READY){;}
     return status;
 
-    //no DMA, use HAL_SPI_Transmit() function
-    //return HAL_SPI_Transmit(&hspi1, pbuff, size, 100);
 }
+
 
 HAL_StatusTypeDef SPI_Read(uint8_t* pbuff, uint16_t size)
 {
@@ -409,18 +385,17 @@ void GC9A01_Initial(void)
 //===============================================================
 //clear screen
 //point to point clear , slowly
+
+
 void ClearScreen(unsigned int bColor)
 {
  unsigned int i,j;
-
  LCD_SetPos(0,0,GC9A01_TFTWIDTH-1,GC9A01_TFTHEIGHT-1);//240x240
-
  for (i=0;i<GC9A01_TFTWIDTH;i++)
  {
 	 for (j=0;j<GC9A01_TFTHEIGHT;j++)
 		 Write_Data_U16(bColor);
  }
-
 }
 
 //===============================================================
@@ -435,49 +410,42 @@ void ClearWindow(unsigned int startX, unsigned int startY, unsigned int endX, un
 {
  unsigned int i;
 
- //Exchange high 8bit and low 8bit of bColor for DMA batch transmit
  unsigned char hb = (bColor&0xFFFF) >> 8;
  unsigned char lb = bColor & 0xFF;
  unsigned short tempColor = lb * 256 + hb;
 
- unsigned int totalSize = (endX-startX) * (endY - startY) * 2; // total clear window data size
- unsigned int bufSize = 512;  // define bufSize, need less than DMA transmit size
+ unsigned int totalSize = (endX-startX) * (endY - startY) * 2;
+ unsigned int bufSize = 512;
 
- unsigned int loopNum = (totalSize - (totalSize % bufSize)) / bufSize; // transmit loop times
- unsigned int modNum = totalSize % bufSize;  // remainder data bytes
+ unsigned int loopNum = (totalSize - (totalSize % bufSize)) / bufSize;
+ unsigned int modNum = totalSize % bufSize;
 
 
- //use a tempBuf to initial bColor data, bufSize < DMA transmit size
  unsigned short tempBuf[bufSize];
  unsigned char * ptempBuf;
 
- //init tempBuf data to tempColor( Exchange high 8bit and low 8bit of bColor )
  for(i=0; i<bufSize; i++){
 	 tempBuf[i] = tempColor;
  }
 
- // Clear window size: from (startX, startY) to (endX, endY)
- LCD_SetPos(startX,startY,endX-1,endY-1);// (endX-startX) * (endY - startY)
+ LCD_SetPos(startX,startY,endX-1,endY-1);
 
- // transmit bufSize byte one time, loopNum loops
  ptempBuf = (unsigned char *)tempBuf;
  for(i=0; i<loopNum; i++){
 	 Write_Bytes(ptempBuf, bufSize);
  }
-
- // transmit remainder data, modNum bytes
  Write_Bytes(ptempBuf, modNum);
 
 }
 
 
 //===============================================================
- void LCD_SetPos(unsigned int Xstart,unsigned int Ystart,unsigned int Xend,unsigned int Yend)
+void LCD_SetPos(unsigned int Xstart,unsigned int Ystart,unsigned int Xend,unsigned int Yend)
 {
 	Write_Cmd(0x2a);
 	Write_Cmd_Data(Xstart>>8);
 	Write_Cmd_Data(Xstart);
- 	Write_Cmd_Data(Xend>>8);
+	Write_Cmd_Data(Xend>>8);
 	Write_Cmd_Data(Xend);
 
 	Write_Cmd(0x2b);
@@ -486,7 +454,7 @@ void ClearWindow(unsigned int startX, unsigned int startY, unsigned int endX, un
 	Write_Cmd_Data(Yend>>8);
 	Write_Cmd_Data(Yend);
 
-  	Write_Cmd(0x2c);//LCD_WriteCMD(GRAMWR);
+ 	Write_Cmd(0x2c);
 }
 
 
@@ -529,47 +497,42 @@ void ClearWindow(unsigned int startX, unsigned int startY, unsigned int endX, un
   {
       unsigned char i, j;
       unsigned char *temp = String6_12;
-      unsigned int bufSize = 512;  // Define bufSize, similar to ClearWindow
-      unsigned short tempBuf[bufSize];  // Buffer to store pixel data for DMA
+      unsigned int bufSize = 512;
+      unsigned short tempBuf[bufSize];
       unsigned short pixelIndex = 0;
 
-      unsigned short dcolor_swapped = ((dcolor & 0xFF) << 8) | ((dcolor >> 8) & 0xFF); // Swap high and low byte
-      unsigned short bgcolor_swapped = ((bgcolor & 0xFF) << 8) | ((bgcolor >> 8) & 0xFF); // Swap high and low byte
+      unsigned short dcolor_swapped = ((dcolor & 0xFF) << 8) | ((dcolor >> 8) & 0xFF);
+      unsigned short bgcolor_swapped = ((bgcolor & 0xFF) << 8) | ((bgcolor >> 8) & 0xFF);
 
-      // Set the new position for the scaled character
       LCD_SetPos(x, y, x + (8 * scale) - 1, y + (12 * scale) - 1);
 
-      temp += (value - 32) * 12;  // Point to the bitmap of the character
+      temp += (value - 32) * 12;
 
-      // Loop through the character bitmap
       for (j = 0; j < 12; j++) {
-          for (int y_scale = 0; y_scale < scale; y_scale++) {  // Y-axis scaling based on 'scale'
+          for (int y_scale = 0; y_scale < scale; y_scale++) {
               for (i = 0; i < 8; i++) {
                   unsigned short pixelColor = ((*temp & (1 << (7 - i))) != 0) ? dcolor_swapped : bgcolor_swapped;
 
-                  for (int x_scale = 0; x_scale < scale; x_scale++) {  // X-axis scaling based on 'scale'
-                      tempBuf[pixelIndex++] = pixelColor;  // Add the scaled pixel
+                  for (int x_scale = 0; x_scale < scale; x_scale++) {
+                      tempBuf[pixelIndex++] = pixelColor;
 
-                      // If the buffer is full, transmit using DMA
                       if (pixelIndex >= bufSize) {
-                          Write_Bytes((unsigned char *)tempBuf, bufSize * 2);  // Send the buffer via DMA
-                          pixelIndex = 0;  // Reset the buffer index
+                          Write_Bytes((unsigned char *)tempBuf, bufSize * 2);
+                          pixelIndex = 0;
                       }
                   }
               }
 
-              // If the buffer is full, transmit using DMA
               if (pixelIndex >= bufSize) {
-                  Write_Bytes((unsigned char *)tempBuf, bufSize * 2);  // Send the buffer via DMA
-                  pixelIndex = 0;  // Reset the buffer index
+                  Write_Bytes((unsigned char *)tempBuf, bufSize * 2);
+                  pixelIndex = 0;
               }
           }
-          temp++;  // Move to the next row in the character bitmap
+          temp++;
       }
 
-      // Send remaining pixels in the buffer
       if (pixelIndex > 0) {
-          Write_Bytes((unsigned char *)tempBuf, pixelIndex * 2);  // Send the remaining data
+          Write_Bytes((unsigned char *)tempBuf, pixelIndex * 2);
       }
   }
 
@@ -586,69 +549,10 @@ void ClearWindow(unsigned int startX, unsigned int startY, unsigned int endX, un
 
 
 
- void showzifu_dma(unsigned int x, unsigned int y, unsigned char value, unsigned int dcolor, unsigned int bgcolor)
- {
-     unsigned char i, j;
-     unsigned char *temp = String6_12;
-     unsigned int bufSize = 512;  // Define bufSize, similar to ClearWindow
-     unsigned short tempBuf[bufSize];  // Buffer to store pixel data for DMA
-     unsigned short pixelIndex = 0;
-
-     unsigned short dcolor_swapped = ((dcolor & 0xFF) << 8) | ((dcolor >> 8) & 0xFF); // Swap high and low byte
-     unsigned short bgcolor_swapped = ((bgcolor & 0xFF) << 8) | ((bgcolor >> 8) & 0xFF); // Swap high and low byte
-
-     LCD_SetPos(x, y, x + 7, y + 11);  // Set position on display for the character (8x12)
-
-     temp += (value - 32) * 12;  // Point to the bitmap of the character
-
-     // Loop through the character bitmap
-     for (j = 0; j < 12; j++) {
-         for (i = 0; i < 8; i++) {
-             if ((*temp & (1 << (7 - i))) != 0) {
-                 tempBuf[pixelIndex++] = dcolor_swapped;  // Use swapped dcolor
-             } else {
-                 tempBuf[pixelIndex++] = bgcolor_swapped;  // Use swapped bgcolor
-             }
-
-             // If the buffer is full, transmit using DMA
-             if (pixelIndex >= bufSize) {
-                 Write_Bytes((unsigned char *)tempBuf, bufSize * 2);  // Send the buffer via DMA
-                 pixelIndex = 0;  // Reset the buffer index
-             }
-         }
-         temp++;
-     }
-
-     // Send remaining pixels in the buffer
-     if (pixelIndex > 0) {
-         Write_Bytes((unsigned char *)tempBuf, pixelIndex * 2);  // Send the remaining data
-     }
- }
-
-
-
- //show String
- void showzifustr(unsigned int x,unsigned int y,unsigned char *str,unsigned int dcolor,unsigned int bgcolor)
- {
- 	unsigned int x1,y1;
- 	x1=x;
- 	y1=y;
- 	while(*str!='\0')
- 	{
- 		showzifu_dma(x1,y1,*str,dcolor,bgcolor);
- 		//x1+=7;
- 		x1 += 18;
- 		str++;
- 	}
- }
-
-
- void LCD_DrawPoint(unsigned int x,unsigned int y,unsigned int color)
- {
+ void LCD_DrawPoint(unsigned int x,unsigned int y,unsigned int color){
  	LCD_SetPos(x,y,x,y);
  	Write_Data_U16(color);
  }
-
 
  void LCD_DrawLine(unsigned int x1,unsigned int y1,unsigned int x2,unsigned int y2,unsigned int color)
  {
