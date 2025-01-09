@@ -1,5 +1,6 @@
+"./Core/Src/cg9a01.o"
 "./Core/Src/main.o"
-"./Core/Src/oximeter5custom.o"
+"./Core/Src/oximeter5.o"
 "./Core/Src/stm32h7xx_hal_msp.o"
 "./Core/Src/stm32h7xx_it.o"
 "./Core/Src/syscalls.o"

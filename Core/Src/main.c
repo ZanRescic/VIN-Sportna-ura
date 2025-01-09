@@ -18,8 +18,9 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "string.h"
-#include "oximeter5custom.h"
+#include "oximeter5.h"
+#include "cg9a01.h"
+#include <string.h>
 #include <stdio.h>
 #include <stdint.h>
 
@@ -96,12 +97,23 @@ SDRAM_HandleTypeDef hsdram1;
 
 /* USER CODE BEGIN PV */
 
-static uint32_t aun_ir_buffer[ 100 ]; //infra red LED buffer
-static uint32_t aun_red_buffer[ 100 ]; //red LED buffer
+#define 	BUFSIZE 256
+char	SendBuffer[BUFSIZE];
+
+#define BUFFER_SIZE 100
+static uint32_t aun_ir_buffer[ BUFFER_SIZE ]; //infra red LED buffer 100
+static uint32_t aun_red_buffer[ BUFFER_SIZE ]; //red LED buffer 100
 static uint32_t un_min, un_max, un_prev_data, un_brightness;
 static float f_temp;
 static uint8_t n_spo2;
-char SendBuffer[50];
+static uint8_t max_spo2;
+static int32_t n_heart_rate;
+static int32_t valid_heart_rate;
+static uint8_t spo2_array[25];
+static int32_t hr_array[25];
+static uint32_t counter;
+char pulse_str[10];
+char spo2_str[10];
 
 /* USER CODE END PV */
 
@@ -128,8 +140,11 @@ static void MX_ADC1_Init(void);
 static void MX_I2C4_Init(void);
 /* USER CODE BEGIN PFP */
 
-void application_init ( void );
-void application_task ( void );
+void application_init(void);
+void application_task(void);
+uint8_t maxSpo2(uint8_t *array, int size);
+int32_t getHeartRate(int32_t *array, int size);
+void bubbleSort(int32_t *array, int size);
 
 /* USER CODE END PFP */
 
@@ -145,7 +160,6 @@ void application_task ( void );
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -191,14 +205,179 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  //Display init
+  GC9A01_Initial();
+  ClearScreen2(0x0000);
+
+  showzifustr_scaled(66, 100-20, "Prisloni", 0xFFFF, 0x0000,2,15);
+  showzifustr_scaled(96, 100+20, "prst", 0xFFFF, 0x0000,2,15);
+
+  application_init();
+  counter = 0;
+
+
   while (1)
   {
-    /* USER CODE END WHILE */
-
-    /* USER CODE BEGIN 3 */
+	  application_task();
   }
-  /* USER CODE END 3 */
 }
+
+void application_init ( void )
+{
+	oximeter5_init();
+	HAL_Delay(100);
+
+	oximeter5_default_cfg();
+	HAL_Delay(100);
+
+    un_brightness = 0;
+    un_min = 0x3FFFF;
+    un_max = 0;
+
+    for ( uint8_t n_cnt = 0; n_cnt < 100; n_cnt++ )
+    {
+        while ( oximeter5_check_interrupt() == OXIMETER5_INTERRUPT_ACTIVE );
+
+        oximeter5_read_sensor_data(&aun_ir_buffer[ n_cnt ], &aun_red_buffer[ n_cnt ] );
+
+        if ( un_min > aun_red_buffer[ n_cnt ] )
+        {
+            un_min = aun_red_buffer[ n_cnt ];
+        }
+
+        if ( un_max < aun_red_buffer[ n_cnt ] )
+        {
+            un_max = aun_red_buffer[ n_cnt ];
+        }
+    }
+    HAL_Delay(100);
+}
+
+void application_task ( void )
+{
+	oximeter5_get_oxygen_saturation(&aun_ir_buffer[ 0 ], 100, &aun_red_buffer[ 0 ], &n_spo2 );
+	oximeter5_get_heart_rate( &aun_ir_buffer[ 0 ], 100, &aun_red_buffer[ 0 ], &n_heart_rate );
+
+	if (n_spo2 <= 100 && n_heart_rate > 40 && n_heart_rate < 180) {
+		spo2_array[counter] = n_spo2;
+		hr_array[counter] = n_heart_rate;
+		counter++;
+
+	}
+
+    for ( uint8_t n_cnt = 25; n_cnt < 100; n_cnt++ )
+    {
+        aun_red_buffer[ n_cnt - 25 ] = aun_red_buffer[ n_cnt ];
+        aun_ir_buffer[ n_cnt - 25 ] = aun_ir_buffer[ n_cnt ];
+
+        if ( un_min > aun_red_buffer[ n_cnt ] )
+        {
+            un_min = aun_red_buffer[ n_cnt ];
+        }
+
+        if ( un_max < aun_red_buffer[ n_cnt ] )
+        {
+            un_max=aun_red_buffer[n_cnt];
+        }
+    }
+
+    for ( uint8_t n_cnt = 75; n_cnt < 100; n_cnt++ )
+    {
+        un_prev_data = aun_red_buffer[ n_cnt - 1 ];
+        while ( oximeter5_check_interrupt() == OXIMETER5_INTERRUPT_ACTIVE );
+
+        oximeter5_read_sensor_data(&aun_ir_buffer[ n_cnt ], &aun_red_buffer[ n_cnt ]);
+
+        if ( aun_red_buffer[ n_cnt ] > un_prev_data )
+        {
+            f_temp = aun_red_buffer[ n_cnt ]-un_prev_data;
+            f_temp /= ( un_max - un_min );
+            f_temp *= MAX_BRIGHTNESS;
+            f_temp = un_brightness - f_temp;
+
+            if ( f_temp < 0 )
+            {
+                un_brightness = 0;
+            }
+            else
+            {
+                un_brightness = ( uint32_t ) f_temp;
+            }
+        }
+        else
+        {
+            f_temp = un_prev_data - aun_red_buffer[ n_cnt ];
+            f_temp /= ( un_max - un_min );
+            f_temp *= MAX_BRIGHTNESS;
+            un_brightness += ( uint32_t ) f_temp;
+
+            if ( un_brightness > MAX_BRIGHTNESS )
+            {
+                un_brightness = MAX_BRIGHTNESS;
+            }
+        }
+
+        oximeter5_read_temperature(&f_temp);
+    }
+
+    if (counter == 25) {
+    	ClearScreen2(0x0000);
+		max_spo2 = maxSpo2(spo2_array, (sizeof(spo2_array) / sizeof(spo2_array[0])));
+		valid_heart_rate = getHeartRate(hr_array, (sizeof(hr_array) / sizeof(hr_array[0])));
+
+	    sprintf(pulse_str, "HR: %d", valid_heart_rate);
+	    sprintf(spo2_str, "SpO2: %d%%", max_spo2);
+	    showzifustr_scaled(60, 100 - 20, pulse_str, 0xFFFF, 0x0000, 2, 15);
+	    showzifustr_scaled(60, 100 + 20, spo2_str, 0xFFFF, 0x0000, 2, 15);
+
+		snprintf(SendBuffer,BUFSIZE,"\tSPO2: %u %%\r\n", max_spo2);
+		HAL_UART_Transmit(&huart3,SendBuffer,strlen(SendBuffer),100);
+
+		snprintf(SendBuffer,BUFSIZE,"\tHR: %ld %\r\n", valid_heart_rate);
+		HAL_UART_Transmit(&huart3,SendBuffer,strlen(SendBuffer),100);
+		counter = 0;
+	}
+}
+
+uint8_t maxSpo2(uint8_t *array, int size) {
+	uint8_t max = array[0];
+	for (uint8_t i = 1; i < size; i++) {
+		if (max < array[i])
+			max = array[i];
+	}
+	memset(array, 0, size);
+	return max;
+}
+
+int32_t getHeartRate(int32_t *array, int size) {
+	bubbleSort(array, size);
+	if (size % 2 == 0) {
+		return (array[size / 2 - 1] + array[size / 2]) / 2;
+	} else {
+		return array[size / 2];
+	}
+}
+
+void bubbleSort(int32_t *array, int size) {
+    int32_t temp;
+    int swapped;
+
+    for (size_t i = 0; i < size - 1; i++) {
+        swapped = 0;
+        for (size_t j = 0; j < size - i - 1; j++) {
+            if (array[j] > array[j + 1]) {
+                temp = array[j];
+                array[j] = array[j + 1];
+                array[j + 1] = temp;
+                swapped = 1;
+            }
+        }
+        if (!swapped) {
+            break;
+        }
+    }
+}
+
 
 /**
   * @brief System Clock Configuration
@@ -960,7 +1139,7 @@ static void MX_SPI2_Init(void)
   hspi2.Instance = SPI2;
   hspi2.Init.Mode = SPI_MODE_MASTER;
   hspi2.Init.Direction = SPI_DIRECTION_2LINES;
-  hspi2.Init.DataSize = SPI_DATASIZE_4BIT;
+  hspi2.Init.DataSize = SPI_DATASIZE_8BIT;
   hspi2.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi2.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi2.Init.NSS = SPI_NSS_HARD_INPUT;

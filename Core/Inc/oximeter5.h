@@ -151,12 +151,14 @@ extern "C"{
 #define OXIMETER5_SET_CFG_MODE_SpO2               0x03
 #define OXIMETER5_SET_CFG_MODE_MULTI_LED          0x07
 
+//ADC range
 #define OXIMETER5_SET_SPO2_CFG_ADC_RGE_BIT_MASK   0x60
 #define OXIMETER5_SET_SPO2_CFG_ADC_RGE_2048       0x00
 #define OXIMETER5_SET_SPO2_CFG_ADC_RGE_4096       0x20
 #define OXIMETER5_SET_SPO2_CFG_ADC_RGE_8192       0x40
 #define OXIMETER5_SET_SPO2_CFG_ADC_RGE_16384      0x60
 
+//Sample Rate
 #define OXIMETER5_SET_SPO2_CFG_SR_SEC_BIT_MASK    0x1C
 #define OXIMETER5_SET_SPO2_CFG_SR_SEC_50          0x00
 #define OXIMETER5_SET_SPO2_CFG_SR_SEC_100         0x04
@@ -167,6 +169,7 @@ extern "C"{
 #define OXIMETER5_SET_SPO2_CFG_SR_SEC_1600        0x14
 #define OXIMETER5_SET_SPO2_CFG_SR_SEC_3200        0x1C
 
+//Pulse width
 #define OXIMETER5_SET_SPO2_CFG_LED_PW_BIT_MASK    0x03
 #define OXIMETER5_SET_SPO2_CFG_LED_PW_15_bit      0x00
 #define OXIMETER5_SET_SPO2_CFG_LED_PW_16_bit      0x01
@@ -455,6 +458,7 @@ err_t oximeter5_get_oxygen_saturation ( uint32_t *pun_ir_buffer, int32_t n_ir_bu
  * @note None.
  */
 err_t oximeter5_get_heart_rate ( uint32_t *pun_ir_buffer, int32_t n_ir_buffer_length, uint32_t *pun_red_buffer, int32_t *pn_heart_rate );
+
 
 #ifdef __cplusplus
 }

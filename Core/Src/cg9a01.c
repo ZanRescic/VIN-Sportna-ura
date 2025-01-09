@@ -15,11 +15,6 @@
 #include "string.h";
 extern SPI_HandleTypeDef hspi2;
 extern UART_HandleTypeDef huart3;
-
-
-
-
-
 #define LCD_RST_1 HAL_GPIO_WritePin(LCD_RST_R_GPIO_Port,LCD_RST_R_Pin,GPIO_PIN_SET)			// LCD_RST = 1 , LCD RESET pin
 #define LCD_RST_0 HAL_GPIO_WritePin(LCD_RST_R_GPIO_Port,LCD_RST_R_Pin,GPIO_PIN_RESET)		// LCD_RST = 0 , LCD RESET pin
 
@@ -77,6 +72,10 @@ void  Write_Data_U16(unsigned int y)
 	Write_Data(m,n);
 }
 
+
+//===================================================================
+//write data byte
+
 void Write_Data(unsigned char DH,unsigned char DL)
 {
     LCD_CS_0;
@@ -100,15 +99,40 @@ void Write_Bytes(unsigned char * pbuff, unsigned short size)
 }
 
 
-HAL_StatusTypeDef SPI_Write(uint8_t* pbuff, uint16_t size){
-
+HAL_StatusTypeDef SPI_Write(uint8_t* pbuff, uint16_t size)
+{
+	//DMA, use HAL_SPI_Transmit_DMA() function
     HAL_StatusTypeDef status =  HAL_SPI_Transmit_DMA(&hspi2, pbuff, size);
 
+    /*switch (status) {
+		case HAL_OK:
+			snprintf(SendBuffer2,BUFSIZE2,"HAL_OK\n\r");
+			HAL_UART_Transmit(&huart3,SendBuffer2,strlen(SendBuffer2),100);
+			break;
+		case HAL_ERROR:
+			snprintf(SendBuffer2,BUFSIZE2,"HAL_ERROR\n\r");
+			HAL_UART_Transmit(&huart3,SendBuffer2,strlen(SendBuffer2),100);
+			break;
+		case HAL_BUSY:
+			snprintf(SendBuffer2,BUFSIZE2,"HAL_BUSY\n\r");
+			HAL_UART_Transmit(&huart3,SendBuffer2,strlen(SendBuffer2),100);
+			break;
+		case HAL_TIMEOUT:
+			snprintf(SendBuffer2,BUFSIZE2,"HAL_TIMEOUT\n\r");
+			HAL_UART_Transmit(&huart3,SendBuffer2,strlen(SendBuffer2),100);
+			break;
+		default:
+			snprintf(SendBuffer2,BUFSIZE2,"OTHER\n\r");
+			HAL_UART_Transmit(&huart3,SendBuffer2,strlen(SendBuffer2),100);
+			break;
+	}
+     */
     while(HAL_SPI_GetState(&hspi2) != HAL_SPI_STATE_READY){;}
     return status;
 
+    //no DMA, use HAL_SPI_Transmit() function
+    //return HAL_SPI_Transmit(&hspi1, pbuff, size, 100);
 }
-
 
 HAL_StatusTypeDef SPI_Read(uint8_t* pbuff, uint16_t size)
 {
@@ -385,17 +409,18 @@ void GC9A01_Initial(void)
 //===============================================================
 //clear screen
 //point to point clear , slowly
-
-
 void ClearScreen(unsigned int bColor)
 {
  unsigned int i,j;
+
  LCD_SetPos(0,0,GC9A01_TFTWIDTH-1,GC9A01_TFTHEIGHT-1);//240x240
+
  for (i=0;i<GC9A01_TFTWIDTH;i++)
  {
 	 for (j=0;j<GC9A01_TFTHEIGHT;j++)
 		 Write_Data_U16(bColor);
  }
+
 }
 
 //===============================================================
@@ -434,18 +459,19 @@ void ClearWindow(unsigned int startX, unsigned int startY, unsigned int endX, un
  for(i=0; i<loopNum; i++){
 	 Write_Bytes(ptempBuf, bufSize);
  }
+
  Write_Bytes(ptempBuf, modNum);
 
 }
 
 
 //===============================================================
-void LCD_SetPos(unsigned int Xstart,unsigned int Ystart,unsigned int Xend,unsigned int Yend)
+ void LCD_SetPos(unsigned int Xstart,unsigned int Ystart,unsigned int Xend,unsigned int Yend)
 {
 	Write_Cmd(0x2a);
 	Write_Cmd_Data(Xstart>>8);
 	Write_Cmd_Data(Xstart);
-	Write_Cmd_Data(Xend>>8);
+ 	Write_Cmd_Data(Xend>>8);
 	Write_Cmd_Data(Xend);
 
 	Write_Cmd(0x2b);
@@ -454,7 +480,7 @@ void LCD_SetPos(unsigned int Xstart,unsigned int Ystart,unsigned int Xend,unsign
 	Write_Cmd_Data(Yend>>8);
 	Write_Cmd_Data(Yend);
 
- 	Write_Cmd(0x2c);
+  	Write_Cmd(0x2c);//LCD_WriteCMD(GRAMWR);
 }
 
 
@@ -507,7 +533,6 @@ void LCD_SetPos(unsigned int Xstart,unsigned int Ystart,unsigned int Xend,unsign
       LCD_SetPos(x, y, x + (8 * scale) - 1, y + (12 * scale) - 1);
 
       temp += (value - 32) * 12;
-
       for (j = 0; j < 12; j++) {
           for (int y_scale = 0; y_scale < scale; y_scale++) {
               for (i = 0; i < 8; i++) {
@@ -549,10 +574,65 @@ void LCD_SetPos(unsigned int Xstart,unsigned int Ystart,unsigned int Xend,unsign
 
 
 
- void LCD_DrawPoint(unsigned int x,unsigned int y,unsigned int color){
+ void showzifu_dma(unsigned int x, unsigned int y, unsigned char value, unsigned int dcolor, unsigned int bgcolor)
+ {
+     unsigned char i, j;
+     unsigned char *temp = String6_12;
+     unsigned int bufSize = 512;
+     unsigned short tempBuf[bufSize];
+     unsigned short pixelIndex = 0;
+
+     unsigned short dcolor_swapped = ((dcolor & 0xFF) << 8) | ((dcolor >> 8) & 0xFF);
+     unsigned short bgcolor_swapped = ((bgcolor & 0xFF) << 8) | ((bgcolor >> 8) & 0xFF);
+
+     LCD_SetPos(x, y, x + 7, y + 11);
+
+     temp += (value - 32) * 12;
+     for (j = 0; j < 12; j++) {
+         for (i = 0; i < 8; i++) {
+             if ((*temp & (1 << (7 - i))) != 0) {
+                 tempBuf[pixelIndex++] = dcolor_swapped;
+             } else {
+                 tempBuf[pixelIndex++] = bgcolor_swapped;
+             }
+
+             if (pixelIndex >= bufSize) {
+                 Write_Bytes((unsigned char *)tempBuf, bufSize * 2);
+                 pixelIndex = 0;
+             }
+         }
+         temp++;
+     }
+
+     if (pixelIndex > 0) {
+         Write_Bytes((unsigned char *)tempBuf, pixelIndex * 2);
+     }
+ }
+
+
+
+ //show String
+ void showzifustr(unsigned int x,unsigned int y,unsigned char *str,unsigned int dcolor,unsigned int bgcolor)
+ {
+ 	unsigned int x1,y1;
+ 	x1=x;
+ 	y1=y;
+ 	while(*str!='\0')
+ 	{
+ 		showzifu_dma(x1,y1,*str,dcolor,bgcolor);
+ 		//x1+=7;
+ 		x1 += 18;
+ 		str++;
+ 	}
+ }
+
+
+ void LCD_DrawPoint(unsigned int x,unsigned int y,unsigned int color)
+ {
  	LCD_SetPos(x,y,x,y);
  	Write_Data_U16(color);
  }
+
 
  void LCD_DrawLine(unsigned int x1,unsigned int y1,unsigned int x2,unsigned int y2,unsigned int color)
  {
@@ -1021,20 +1101,16 @@ void LCD_SetPos(unsigned int Xstart,unsigned int Ystart,unsigned int Xend,unsign
      a = 0;
      b = r;
 
-     // Convert start and end angles to radians
      float start_rad = start_angle * PI / 180.0;
      float end_rad = end_angle * PI / 180.0;
 
-     // Loop through each point in the circle and check if it's within the arc's angle range
      while (a <= b)
      {
-         // Calculate angles for each octant of the circle
          float angle1 = atan2(-a, -b); // Angle for quadrant 3
          float angle2 = atan2(-a, b);  // Angle for quadrant 4
          float angle3 = atan2(b, -a);  // Angle for quadrant 2
          float angle4 = atan2(b, a);   // Angle for quadrant 1
 
-         // Draw points if within the start and end angles
          if (angle1 >= start_rad && angle1 <= end_rad)
              LCD_DrawPoint(x0 - b, y0 - a, color);  // Quadrant 3
          if (angle2 >= start_rad && angle2 <= end_rad)
@@ -1044,7 +1120,6 @@ void LCD_SetPos(unsigned int Xstart,unsigned int Ystart,unsigned int Xend,unsign
          if (angle4 >= start_rad && angle4 <= end_rad)
              LCD_DrawPoint(x0 + a, y0 + b, color);  // Quadrant 1
 
-         // Continue drawing circle
          a++;
          if ((a * a + b * b) > (r * r))
          {

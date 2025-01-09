@@ -1,4 +1,4 @@
-#include "oximeter5custom.h"
+#include "oximeter5.h"
 #include "main.h"
 #include <stdint.h>
 #include <stdio.h>
@@ -66,17 +66,19 @@ static void dev_find_peaks ( int32_t *pn_locs, int32_t *n_npks,  int32_t  *pn_x,
 
 err_t oximeter5_init ( void )
 {
-	retval = HAL_I2C_IsDeviceReady(&hi2c4, (OXIMETER5_SET_DEV_ADDR << 1), 3, 100);
-	if (retval != HAL_OK)
-	{
-		snprintf(SendBuffer1, sizeof(SendBuffer1), "Device not ready\n\r");
-		HAL_UART_Transmit(&huart3, SendBuffer1, strlen(SendBuffer1), 100);
-		return OXIMETER5_ERROR;
-	} else {
-		snprintf(SendBuffer1, sizeof(SendBuffer1), "Device ready\n\r");
-		HAL_UART_Transmit(&huart3, SendBuffer1, strlen(SendBuffer1), 100);
-		return OXIMETER5_OK;
+	retval = !HAL_OK;
+	while (retval != HAL_OK){
+		retval = HAL_I2C_IsDeviceReady(&hi2c4, (OXIMETER5_SET_DEV_ADDR << 1), 3, 100);
+		if (retval != HAL_OK)
+		{
+			snprintf(SendBuffer1, sizeof(SendBuffer1), "Device not ready\n\r");
+			HAL_UART_Transmit(&huart3, SendBuffer1, strlen(SendBuffer1), 100);
+		}
+		HAL_Delay(1000);
 	}
+	snprintf(SendBuffer1, sizeof(SendBuffer1), "Device ready\n\r");
+	HAL_UART_Transmit(&huart3, SendBuffer1, strlen(SendBuffer1), 100);
+	return OXIMETER5_OK;
 }
 
 err_t oximeter5_default_cfg ( void )
@@ -116,6 +118,7 @@ err_t oximeter5_default_cfg ( void )
     HAL_Delay(10);
 
     tmp = OXIMETER5_SET_CFG_MODE_SpO2;
+    //tmp = OXIMETER5_SET_CFG_MODE_HEART_RATE;
     error_flag |= oximeter5_generic_write(OXIMETER5_REG_MODE_CONFIG, &tmp, 1 );
     HAL_Delay(10);
 
@@ -141,53 +144,19 @@ err_t oximeter5_default_cfg ( void )
 
 err_t oximeter5_generic_write ( uint8_t reg, uint8_t *tx_buf, uint8_t tx_len )
 {
-    uint8_t data_buf[ 257 ] = { 0 };
-
-    data_buf[ 0 ] = reg;
-
-    for ( uint8_t cnt = 1; cnt <= tx_len; cnt++ )
-    {
-        data_buf[ cnt ] = tx_buf[ cnt - 1 ];
-    }
-    retval = HAL_I2C_Master_Transmit(&hi2c4, (OXIMETER5_SET_DEV_ADDR << 1), data_buf, tx_len+1, 1000);
-    if (retval != HAL_OK)
-	{
-		snprintf(SendBuffer1, sizeof(SendBuffer1), "Transmit failed\n\r");
-		//HAL_UART_Transmit(&huart3, SendBuffer1, strlen(SendBuffer1), 100);
-		return OXIMETER5_ERROR;
-	} else {
-		snprintf(SendBuffer1, sizeof(SendBuffer1), "Transmit successful\n\r");
-		//HAL_UART_Transmit(&huart3, SendBuffer1, strlen(SendBuffer1), 100);
-		return OXIMETER5_OK;
-	}
-    //return i2c_master_write( &ctx->i2c, data_buf, tx_len + 1 );
+	retval = HAL_I2C_Mem_Write(&hi2c4, (OXIMETER5_SET_DEV_ADDR << 1), reg, I2C_MEMADD_SIZE_8BIT, tx_buf, tx_len, HAL_MAX_DELAY);
+	return retval;
 }
 
 err_t oximeter5_generic_read ( uint8_t reg, uint8_t *rx_buf, uint8_t rx_len )
 {
-	if (oximeter5_generic_write(reg, rx_buf, rx_len) == OXIMETER5_OK) {
-		retval = HAL_I2C_Master_Receive(&hi2c4, (OXIMETER5_SET_DEV_ADDR << 1),rx_buf, rx_len, 1000);
-		if (retval != HAL_OK)
-		{
-			snprintf(SendBuffer1, sizeof(SendBuffer1), "Receive failed\n\r");
-			HAL_UART_Transmit(&huart3, SendBuffer1, strlen(SendBuffer1), 100);
-			return OXIMETER5_ERROR;
-		} else {
-			snprintf(SendBuffer1, sizeof(SendBuffer1), "Receive successful\n\r");
-			HAL_UART_Transmit(&huart3, SendBuffer1, strlen(SendBuffer1), 100);
-			return OXIMETER5_OK;
-		}
-	}
-	snprintf(SendBuffer1, sizeof(SendBuffer1), "Write before read failed\n\r");
-	HAL_UART_Transmit(&huart3, SendBuffer1, strlen(SendBuffer1), 100);
-	return OXIMETER5_ERROR;
-    //return i2c_master_write_then_read( &ctx->i2c, &reg, 1, rx_buf, rx_len );
+	retval = HAL_I2C_Mem_Read(&hi2c4, (OXIMETER5_SET_DEV_ADDR << 1), reg, I2C_MEMADD_SIZE_8BIT, rx_buf, rx_len, HAL_MAX_DELAY);
+	return retval;
 }
 
 uint8_t oximeter5_check_interrupt ( void )
 {
 	return HAL_GPIO_ReadPin(GPIOH, GPIO_PIN_12) == GPIO_PIN_SET ? OXIMETER5_INTERRUPT_ACTIVE : OXIMETER5_INTERRUPT_INACTIVE;
-    //return digital_in_read( &ctx->int_pin );
 }
 
 err_t oximeter5_sw_reset ( void )
@@ -253,7 +222,7 @@ err_t oximeter5_set_mode_cfg ( uint8_t mode )
     return oximeter5_generic_write(OXIMETER5_REG_MODE_CONFIG, &mode, 1 );
 }
 
-err_t oximeter5_set_spo2_cfg ( uint8_t spo2_adc_rge,  uint8_t spo2_sr, uint8_t led_pw )
+err_t oximeter5_set_spo2_cfg ( uint8_t spo2_adc_rge, uint8_t spo2_sr, uint8_t led_pw )
 {
     uint8_t tx_data;
 
@@ -536,6 +505,7 @@ err_t oximeter5_get_heart_rate ( uint32_t *pun_ir_buffer, int32_t n_ir_buffer_le
   return error_flag;
 
 }
+
 
 static void dev_peaks_above_min_height ( int32_t *pn_locs, int32_t *n_npks,  int32_t  *pn_x, uint8_t n_size, int32_t n_min_height )
 {
