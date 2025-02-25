@@ -118,7 +118,6 @@ err_t oximeter5_default_cfg ( void )
     HAL_Delay(10);
 
     tmp = OXIMETER5_SET_CFG_MODE_SpO2;
-    //tmp = OXIMETER5_SET_CFG_MODE_HEART_RATE;
     error_flag |= oximeter5_generic_write(OXIMETER5_REG_MODE_CONFIG, &tmp, 1 );
     HAL_Delay(10);
 

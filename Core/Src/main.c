@@ -215,7 +215,6 @@ int main(void)
   application_init();
   counter = 0;
 
-
   while (1)
   {
 	  application_task();
